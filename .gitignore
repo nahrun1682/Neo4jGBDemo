@@ -27,11 +27,6 @@ wheels/
 *.swp
 *.swo
 
-# Docker
-docker-compose.override.yml
-**/docker-compose.override.yml
-infra/**/data/
-
 # Logs
 .log
 logs/
@@ -44,3 +39,5 @@ infra/**
 
 # Artifacts
 artifacts/
+
+image/
