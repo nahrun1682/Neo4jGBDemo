@@ -34,6 +34,39 @@ GUI 連携：Graph Builder（ホスト/自己ホスト）から 同じ DB に接
 （任意）Docker/Compose：Neo4j / Langfuse を profiles で起動
 
 Repository Layout
+# GraphRAG Starter — Neo4j + Python (+ Langfuse optional)
+
+「まず動く」を目標にした GraphRAG のスターターキットです。
+このリポジトリは、PDF などのドキュメントから Knowledge Graph を抽出し、Neo4j に書き込みつつ検索用に JSON も保存する最小構成を提供します。
+
+## TL;DR
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+
+# 疎通 & 索引（Aura / Local 共通）
+python -m src.scripts.test_connection
+python -m src.scripts.create_indexes
+
+# 抽出（PDF → KG）：Neo4j 書込み + JSON 保存（artifacts/）
+python -m src.scripts.kg_extract sample.pdf
+```
+
+GUI でチャットする場合は、Graph Builder の `/chat-only` を開き、同じ Neo4j に接続してください。
+
+## 特徴
+
+- 抽出（KG 化）：`neo4j-graphrag` の SimpleKGPipeline を利用
+- 二刀流出力：Neo4j 書き込みと JSON 保存（監査・再現用）
+- 検索基盤：Full-Text Index と Vector Index を併用
+- GUI 連携：Graph Builder（ホスト/自己ホスト）から同じ DB に接続して Q&A
+- `.env` で Aura / Local を切り替え可能
+- （任意）Docker Compose で Neo4j / Langfuse を起動可能
+
+## リポジトリ構成
+
+```
 repo/
 ├─ src/
 │  ├─ scripts/
@@ -44,28 +77,33 @@ repo/
 │     └─ settings.py             # .env 読み込み
 ├─ artifacts/                    # 抽出結果 JSON の置き場
 ├─ infra/
-│  ├─ compose.yml                # Neo4j / Langfuse（profiles で出し分け）
+│  ├─ compose.yml                # Neo4j / Langfuse（profiles で切替）
 │  └─ import/                    # （任意）APOC import 用
 ├─ .env.example
 ├─ requirements.txt
 └─ README.md
+```
 
-Prerequisites
+## 前提
 
-Python 3.10+
+- Python 3.10+
+- 推奨：Neo4j Aura Free（クラウド / TLS）
+- 任意：Docker / Docker Compose（ローカルで Neo4j や Langfuse を使う場合）
 
-推奨：Neo4j Aura Free（クラウド / TLS）
+## セットアップ
 
-任意：Docker / Docker Compose（ローカル Neo4j や Langfuse を使う場合）
+1. 依存関係をインストール
 
-Setup
-1) インストール & 環境変数
+```bash
 pip install -r requirements.txt
 cp .env.example .env
+```
 
+2. `.env` を編集して接続情報を設定します。
 
-.env（例：Aura を使う場合）
+例（Aura を使う場合）:
 
+```
 NEO4J_URI=neo4j+s://<hash>.databases.neo4j.io
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=********
@@ -80,40 +118,53 @@ PG_DB=langfuse
 NEXTAUTH_SECRET=devsecret_change_me
 ENCRYPTION_KEY=devkeydevkeydevkeydevkey
 COMPOSE_PROJECT_NAME=graphrag
+```
 
+ローカル Neo4j を使う場合は `NEO4J_URI=bolt://neo4j:7687` に切り替えてください。
 
-ローカル Neo4j を使う場合は NEO4J_URI=bolt://neo4j:7687 に切替。
+## Quick Start
 
-Quick Start
-A) Aura（Docker 不要）
+### A) Aura（Docker 不要）
+
+```bash
 python -m src.scripts.test_connection        # RETURN 1
 python -m src.scripts.create_indexes         # FTS / Vector 作成
 python -m src.scripts.kg_extract sample.pdf  # → artifacts/extracted_kg.json
+```
 
+Graph Builder の `/chat-only` を開き、`.env` と同じ Aura に接続すれば GUI チャットが利用できます。
 
-GUI チャット：Graph Builder の /chat-only を開き、.env と同じ Aura に接続。
+### B) Local（Docker で Neo4j 起動）
 
-B) Local（Docker で Neo4j 起動）
-# Neo4j だけ起動（profiles: neo4j）
+Neo4j のみ起動（profiles: neo4j）:
+
+```bash
 docker compose -f infra/compose.yml --profile neo4j up -d
+```
 
-# .env を bolt://neo4j:7687 に切替してから：
+`.env` を `bolt://neo4j:7687` に切り替えてから:
+
+```bash
 python -m src.scripts.test_connection
 python -m src.scripts.create_indexes
 python -m src.scripts.kg_extract sample.pdf
+```
 
+（任意）Langfuse を使う場合:
 
-（任意）Langfuse を使う場合：
-
+```bash
 docker compose -f infra/compose.yml --profile langfuse up -d
-# Web: http://localhost:3001
+# Web UI: http://localhost:3001
+```
 
-Scripts
+## スクリプト
 
-src/scripts/test_connection.py：Aura / Local への接続確認（RETURN 1）
+- `src/scripts/test_connection.py`：Aura / Local への接続確認（RETURN 1）
+- `src/scripts/create_indexes.py`：索引作成（Cypher 例）
 
-src/scripts/create_indexes.py：索引作成（Cypher 例）
+例 — Fulltext と Vector Index:
 
+```cypher
 CREATE FULLTEXT INDEX chunkText IF NOT EXISTS
 FOR (c:Chunk) ON EACH [c.text];
 
@@ -123,59 +174,50 @@ OPTIONS { indexConfig: {
   `vector.dimensions`: 1536,
   `vector.similarity_function`: 'cosine'
 }};
+```
 
+- `src/scripts/kg_extract.py`：SimpleKGPipeline による抽出 → Neo4j 書込み + JSON 保存
+  - 内部で `MultiWriter`（`Neo4jWriter` + `JsonWriter`）を使用します。
 
-src/scripts/kg_extract.py：SimpleKGPipeline で 抽出 → Neo4j 書込み＋JSON 保存
-（内部で MultiWriter：Neo4jWriter + JsonWriter を使用）
+## Docker（任意）
 
-Docker（任意）
+`infra/compose.yml` に Neo4j / Langfuse のサービス定義があります。profiles で出し分け可能です。
 
-infra/compose.yml に Neo4j / Langfuse を統合しています（profiles で出し分け）。
-
-# Neo4jのみ
+```bash
+# Neo4j のみ
 docker compose -f infra/compose.yml --profile neo4j up -d
 
-# Langfuseのみ（Web+Worker+Postgres）
+# Langfuse のみ（Web + Worker + Postgres）
 docker compose -f infra/compose.yml --profile langfuse up -d
 
 # 両方まとめて
 docker compose -f infra/compose.yml --profile neo4j --profile langfuse up -d
+```
 
+コンテナ間はサービス名で接続します（例：`bolt://neo4j:7687`）。`localhost` ではありません。
 
-サービス間は サービス名で接続（例：bolt://neo4j:7687）。localhost ではありません。
+## データフロー（最小構成）
 
-Data Flow（最小）
+1. PDF / テキストを投入
+2. Split → LLM による抽出（Entities / Relations）
+3. Neo4j に MERGE（Doc / Chunk / Entity / REL）
+4. FTS / Vector Index を作成
+5. GUI または Python で質問 → 候補チャンク＋近傍を文脈化 → 回答
+6. 根拠（`chunk_id` / `score` / `excerpt`）を表示
 
-PDF / テキスト投入
+## トラブルシューティング
 
-Split → LLM 抽出（Entities/Relations）
+- 接続できない：Aura は `neo4j+s://`、Local は `bolt://`。ポート 7687 と認証、`.env` を確認してください。
+- Vector Index エラー：埋め込み次元（例：1536）と `similarity_function` を一致させる。
+- Docker 内から `localhost` に繋がらない：コンテナ間はサービス名で接続する（例：`bolt://neo4j:7687`）。
+- データが消えた：`docker compose down -v` はボリュームも削除します（通常は `down` のみを使う）。
 
-Neo4j へ MERGE（Doc / Chunk / Entity / REL）
+## Deliverables（インターン向け）
 
-FTS / Vector Index を作成
+- PDF → KG → FTS/Vector → 回答＋根拠表示 が通ること
+- `.env` で Aura / Local を切替可能であること
+- 本 README の手順で再現可能であること
 
-GUI or Python で質問 → 候補チャンク＋近傍を文脈化 → 回答
-
-根拠（chunk_id / score / excerpt）を表示
-
-Troubleshooting
-
-接続できない：Aura は neo4j+s://、Local は bolt://。ポート 7687 と認証、.env を確認。
-
-Vector Index エラー：埋め込み次元（例：1536）と similarity_function を一致。
-
-Docker 内から localhost に繋がらない：neo4j サービス名へ接続。
-
-データが消えた：docker compose down -v はボリュームも削除します（通常は down のみ）。
-
-Deliverables（インターン向け）
-
-PDF→KG→FTS/Vector→回答＋根拠表示 が通る
-
-.env で Aura / Local を切替可能
-
-本 README の手順で 再現可能
-
-License
+## ライセンス
 
 MIT（予定）
