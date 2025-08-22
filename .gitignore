@@ -15,7 +15,6 @@ wheels/
 
 # Env files (secrets) — 必ず無視
 .env
-.env.*
 
 # Byte-compiled / cached
 *.py[cod]
@@ -31,11 +30,11 @@ wheels/
 .log
 logs/
 
-# infra のフォルダ構成だけ追跡（ファイルは無視）
-# - infra/** で infra 以下のすべてを無視
-# - !infra/**/ でディレクトリ自体は無視解除（Git は空ディレクトリを追跡できないため、実際には .gitkeep 等のファイルを配置してください）
+# infra
 infra/**
 !infra/**/
+!infra/neo4j/
+!infra/neo4j/**
 
 # Artifacts
 # artifacts/
