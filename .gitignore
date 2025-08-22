@@ -38,6 +38,6 @@ infra/**
 !infra/**/
 
 # Artifacts
-artifacts/
+# artifacts/
 
 image/
