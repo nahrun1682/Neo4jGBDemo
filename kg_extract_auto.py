@@ -12,7 +12,7 @@ async def main():
     runner = PipelineRunner.from_config_file("src/scripts/config/kg_config_auto.yml")
     pipeline = runner.pipeline  # ← ここで Pipeline を取り出す
 
-    user_input = {"file_path": "data/オグリキャップ.pdf"}
+    user_input = {"file_path": "data/APIReference_OpenAI_API.pdf"}
     if runner.config:
         stream_params = deep_update(runner.run_params, runner.config.get_run_params(user_input))
     else:

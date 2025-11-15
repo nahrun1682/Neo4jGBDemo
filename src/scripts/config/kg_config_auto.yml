@@ -89,8 +89,8 @@ from_pdf: true
 text_splitter:
   class_: text_splitters.fixed_size_splitter.FixedSizeSplitter
   params_:
-    chunk_size: 4000
-    chunk_overlap: 400
+    chunk_size: 6000
+    chunk_overlap: 600
 
 
 # ----------------------------------------------

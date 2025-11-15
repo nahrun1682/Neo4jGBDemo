@@ -70,5 +70,5 @@ def main(json_path: str = "artifacts/kg_graph.json") -> None:
     print("✅ Writing finished.")
 
 if __name__ == "__main__":
-    json_path = "artifacts/kg_graph_オグリキャップ.json"
+    json_path = "artifacts/neo4j_export.json"
     main(json_path=json_path)
