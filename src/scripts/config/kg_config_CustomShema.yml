@@ -1,0 +1,218 @@
+# ============================================================
+# Neo4j SimpleKGPipeline - 完全検証済み設定ファイル
+# 作成日: 2025-11-15
+# 
+# 重要: このYAMLの全パラメータはソースコード検証済み✅
+# 存在しないパラメータは無視されるので注意⚠️
+# ============================================================
+
+# ----------------------------------------------
+# 基本設定 (必須)
+# 根拠: SimpleKGPipelineConfig.template_ (line 37-39)
+# URL: https://neo4j.com/docs/neo4j-graphrag-python/current/user-guide-kg-builder.html
+# ----------------------------------------------
+version_: 1
+template_: SimpleKGPipeline
+
+
+# ----------------------------------------------
+# 1. Neo4j データベース接続設定 (必須)
+# 根拠: TemplatePipelineConfig.neo4j_config (親クラス)
+# URL: https://neo4j.com/docs/neo4j-graphrag-python/current/user-guide-kg-builder.html#_neo4j_connection
+# ----------------------------------------------
+neo4j_config:
+  params_:
+    uri: bolt://localhost:7687
+    user: neo4j
+    password:
+      # 環境変数から読み込み推奨🔐
+      resolver_: ENV
+      var_: NEO4J_PASSWORD
+
+
+# ----------------------------------------------
+# 2. Neo4j データベース名 (オプション)
+# デフォルト: "neo4j"
+# 根拠: SimpleKGPipelineConfig.neo4j_database (line 50)
+# URL: https://neo4j.com/docs/neo4j-graphrag-python/current/api-documentation.html
+# ----------------------------------------------
+neo4j_database: neo4j
+
+
+# ----------------------------------------------
+# 3. LLM (Large Language Model) 設定 (必須)
+# 根拠: TemplatePipelineConfig.llm_config
+# URL: https://neo4j.com/docs/neo4j-graphrag-python/current/user-guide-kg-builder.html#_llm_configuration
+# ----------------------------------------------
+llm_config:
+  class_: OpenAILLM
+  params_:
+    model_name: gpt-5-nano
+    api_key:
+      resolver_: ENV
+      var_: OPENAI_API_KEY
+    model_params:
+      temperature: 0
+      max_tokens: 2000
+      response_format:
+        type: json_object
+
+
+# ----------------------------------------------
+# 4. Embedder (埋め込みモデル) 設定 (必須)
+# 根拠: TemplatePipelineConfig.embedder_config
+# URL: https://neo4j.com/docs/neo4j-graphrag-python/current/user-guide-kg-builder.html#_embedder_configuration
+# ----------------------------------------------
+embedder_config:
+  class_: OpenAIEmbeddings
+  params_:
+    model: text-embedding-3-small
+    api_key:
+      resolver_: ENV
+      var_: OPENAI_API_KEY
+
+
+# ----------------------------------------------
+# 5. PDFから読み込むか (オプション)
+# デフォルト: False
+# 根拠: SimpleKGPipelineConfig.from_pdf (line 41)
+# ----------------------------------------------
+from_pdf: true
+
+
+# ----------------------------------------------
+# 6. テキスト分割設定 (オプション)
+# ゆうと様確認: これは存在する✅
+# 根拠: SimpleKGPipelineConfig.text_splitter (line 53)
+# デフォルト: FixedSizeSplitter(chunk_size=4000, chunk_overlap=200)
+# ----------------------------------------------
+text_splitter:
+  class_: text_splitters.fixed_size_splitter.FixedSizeSplitter
+  params_:
+    chunk_size: 1000
+    chunk_overlap: 200
+
+
+# ----------------------------------------------
+# 7. スキーマ定義 (推奨✨)
+# 根拠: SimpleKGPipelineConfig.schema_ (line 45, alias="schema")
+# URL: https://neo4j.com/docs/neo4j-graphrag-python/current/user-guide-kg-builder.html#_graph_schema
+# 
+# 注意: スキーマは外部ファイル管理を推奨💡
+# この例では直接定義していますが、
+# 実際はschema.yamlを別ファイルにしてPythonで読み込む方が良い
+# ----------------------------------------------
+
+# オプション1: 自動抽出 (LLMがスキーマ生成)
+# schema: "EXTRACTED"
+
+# オプション2: 自由形式 (スキーマ制約なし)
+# schema: "FREE"
+
+# オプション3: カスタム定義 (推奨✨)
+schema:
+  node_types:
+    # シンプル定義
+    - Person
+    - Technology
+    - Company
+    
+    # 詳細定義(プロパティ付き)
+    - label: Project
+      description: プロジェクトや製品
+      properties:
+        - name: name
+          type: STRING
+        - name: status
+          type: STRING
+  
+  relationship_types:
+    - WORKS_AT
+    - USES
+    
+    - label: COLLABORATES_WITH
+      description: 協力関係
+      properties:
+        - name: project_name
+          type: STRING
+  
+  patterns:
+    - ["Person", "WORKS_AT", "Company"]
+    - ["Person", "USES", "Technology"]
+    - ["Person", "COLLABORATES_WITH", "Person"]
+
+
+# ----------------------------------------------
+# 8. エンティティ解決 (Entity Resolution)
+# デフォルト: true
+# 根拠: SimpleKGPipelineConfig.perform_entity_resolution (line 48)
+# URL: https://graphacademy.neo4j.com/courses/llm-knowledge-graph-construction/3-llm-extract-entity-relation/8-entity-resolution/
+# 
+# true = SinglePropertyExactMatchResolverが自動実行✅
+# false = エンティティ解決なし(重複ノード作成される可能性)
+# ----------------------------------------------
+perform_entity_resolution: true
+
+
+# ----------------------------------------------
+# 9. エラー処理方法
+# デフォルト: IGNORE
+# 根拠: SimpleKGPipelineConfig.on_error (line 46)
+# 選択肢: IGNORE, RAISE
+# ----------------------------------------------
+on_error: IGNORE
+
+
+# ----------------------------------------------
+# 10. カスタムプロンプトテンプレート (オプション)
+# ゆうと様推奨: Phase 1でOpen IE風プロンプト使用🎯
+# 根拠: SimpleKGPipelineConfig.prompt_template (line 47)
+# デフォルト: ERExtractionTemplate()
+# ----------------------------------------------
+# prompt_template: |
+#   あなたは知識グラフ構築の専門家です。
+#   以下のテキストから、エンティティと関係を自由に抽出してください。
+#   
+#   【重要】スキーマ制約を無視して、冗長でも全て抽出してください。
+#   
+#   テキスト:
+#   {text}
+#   
+#   JSON形式で出力してください。
+
+
+# ----------------------------------------------
+# 11. Lexical Graph設定 (オプション)
+# 根拠: SimpleKGPipelineConfig.lexical_graph_config (line 49)
+# URL: https://graphacademy.neo4j.com/courses/llm-knowledge-graph-construction/3-llm-extract-entity-relation/5-lexical-graph/
+# ----------------------------------------------
+lexical_graph_config:
+  chunk_node_label: Chunk
+  document_node_label: Document
+  chunk_to_entity_relationship_type: MENTIONS
+  chunk_to_document_relationship_type: FROM_DOCUMENT
+  next_chunk_relationship_type: NEXT_CHUNK
+  chunk_embedding_property: embedding
+
+
+# ----------------------------------------------
+# 12. カスタムPDFローダー (オプション)
+# 根拠: SimpleKGPipelineConfig.pdf_loader (line 51)
+# デフォルトのPdfLoaderで十分な場合はコメントアウト推奨
+# ----------------------------------------------
+# pdf_loader:
+#   class_: PdfLoader
+#   params_:
+#     # カスタムパラメータ
+
+
+# ----------------------------------------------
+# 13. カスタムKGWriter (オプション)
+# 根拠: SimpleKGPipelineConfig.kg_writer (line 52)
+# デフォルトのNeo4jWriterで十分な場合はコメントアウト推奨
+# ----------------------------------------------
+# kg_writer:
+#   class_: Neo4jWriter
+#   params_:
+#     # カスタムパラメータ
+
